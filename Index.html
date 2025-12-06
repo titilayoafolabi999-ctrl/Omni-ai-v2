@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmniTutor v2.0 - Cyberpunk Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome (v6 for modern icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Import Map for Google Generative AI SDK -->
+    <script type="importmap">
+    {
+        "imports": {
+            "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+    }
+    </script>
+    <style>
+        /* --- Neon Cyberpunk Theme --- */
+        :root {
+            --bg-dark: #00001a;
+            --neon-blue: #06b6d4;
+            --neon-fuchsia: #d946ef;
+            --sidebar-width: 4rem; /* Collapsed width */
+            --sidebar-width-expanded: 16rem; /* Expanded width */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #e0f2fe;
+            overflow-x: hidden;
+            transition: background-color 0.5s ease;
+        }
+
+        /* Neon & Glass Effects */
+        .shadow-neon { box-shadow: 0 0 8px var(--neon-blue), 0 0 15px var(--neon-fuchsia); }
+        .text-neon { text-shadow: 0 0 5px var(--neon-blue), 0 0 10px var(--neon-fuchsia); }
+        .glass-morphism {
+            background-color: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(6, 182, 212, 0.3);
+        }
+
+        /* --- NAVIGATION SYSTEM --- */
+        #main-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 50;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        #main-menu.expanded { width: var(--sidebar-width-expanded); }
+        
+        #content-area {
+            margin-left: var(--sidebar-width);
+            width: calc(100% - var(--sidebar-width));
+            transition: margin-left 0.3s, width 0.3s;
+            min-height: 100vh;
+        }
+
+        /* --- MOBILE RESPONSIVENESS --- */
+        @media (max-width: 768px) {
+            #main-menu { width: 0; border-right: none; }
+            #main-menu.expanded { width: 100%; max-width: 300px; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
+            #content-area { margin-left: 0 !important; width: 100% !important; padding-left: 1rem; padding-right: 1rem; }
+            #mobile-menu-trigger { display: block; }
+        }
+
+        #mobile-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(2px);
+            z-index: 40;
+        }
+        #mobile-backdrop.active { display: block; }
+        @media (min-width: 769px) { #mobile-menu-trigger { display: none; } }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        
+        /* Utility */
+        .hidden { display: none !important; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+
+<body class="flex flex-col md:flex-row">
+
+    <!-- Mobile Backdrop -->
+    <div id="mobile-backdrop" onclick="app.toggleMenu()"></div>
+
+    <!-- MAIN MENU (Sidebar) -->
+    <nav id="main-menu" class="glass-morphism flex flex-col pt-4 pb-2">
+        <div class="flex justify-end p-4">
+            <button id="main-menu-toggle" class="text-cyan-400 hover:text-fuchsia-400 p-2 transition">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+        </div>
+
+        <div id="menu-items" class="flex flex-col space-y-1 overflow-y-auto px-2">
+            <button onclick="app.showInterface('home')" class="menu-item group flex items-center p-3 text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                <i class="fa-solid fa-home w-8 text-center text-cyan-500 group-hover:text-fuchsia-400"></i>
+                <span class="ml-3 opacity-0 group-[.expanded]:opacity-100 transition-opacity duration-200 menu-text">Home</span>
+            </button>
+            
+            <button onclick="app.showInterface('ai-assistant')" class="menu-item group flex items-center p-3 text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                <i class="fa-solid fa-robot w-8 text-center text-cyan-500 group-hover:text-fuchsia-400"></i>
+                <span class="ml-3 opacity-0 group-[.expanded]:opacity-100 transition-opacity duration-200 menu-text">AI Assistant</span>
+            </button>
+            
+            <button onclick="app.showInterface('code-editor')" class="menu-item group flex items-center p-3 text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                <i class="fa-solid fa-code w-8 text-center text-cyan-500 group-hover:text-fuchsia-400"></i>
+                <span class="ml-3 opacity-0 group-[.expanded]:opacity-100 transition-opacity duration-200 menu-text">Code Editor</span>
+            </button>
+
+            <button onclick="app.showInterface('file-manager')" class="menu-item group flex items-center p-3 text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                <i class="fa-solid fa-folder-tree w-8 text-center text-cyan-500 group-hover:text-fuchsia-400"></i>
+                <span class="ml-3 opacity-0 group-[.expanded]:opacity-100 transition-opacity duration-200 menu-text">File Manager</span>
+            </button>
+
+             <button onclick="app.showInterface('live-preview')" class="menu-item group flex items-center p-3 text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition">
+                <i class="fa-solid fa-desktop w-8 text-center text-cyan-500 group-hover:text-fuchsia-400"></i>
+                <span class="ml-3 opacity-0 group-[.expanded]:opacity-100 transition-opacity duration-200 menu-text">Live Preview</span>
+            </button>
+            
+            <div class="border-t border-slate-700 my-2"></div>
+            
+            <button onclick="app.showInterface('v2-advanced')" class="menu-item group flex items-center p-3 text-sm font-light text-slate-400 hover:bg-slate-800 rounded-lg transition">
+                <i class="fa-solid fa-gauge-high w-8 text-center"></i>
+                <span class="ml-3 opacity-0 group-[.expanded]:opacity-100 transition-opacity duration-200 menu-text">v2.0 Dashboard</span>
+            </button>
+
+            <!-- v1.0 Link (External) -->
+            <a href="https://omni-ai-tutor-v1.netlify.app/" target="_blank" class="menu-item group flex items-center p-3 text-sm font-light text-slate-400 hover:bg-slate-800 rounded-lg transition">
+                <i class="fa-solid fa-arrow-up-right-from-square w-8 text-center text-yellow-500 group-hover:text-yellow-300"></i>
+                <span class="ml-3 opacity-0 group-[.expanded]:opacity-100 transition-opacity duration-200 menu-text">v1.0 Classic</span>
+            </a>
+
+            <!-- Settings Button -->
+            <button onclick="app.showInterface('settings')" class="menu-item group flex items-center p-3 text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition mt-auto">
+                <i class="fa-solid fa-gear w-8 text-center text-slate-500 group-hover:text-slate-300"></i>
+                <span class="ml-3 opacity-0 group-[.expanded]:opacity-100 transition-opacity duration-200 menu-text">Settings</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- CONTENT AREA -->
+    <main id="content-area" class="relative z-10 pt-4 pb-12">
+        
+        <header class="flex items-center justify-between mb-6 px-4 md:px-8">
+            <div class="flex items-center">
+                <button id="mobile-menu-trigger" onclick="app.toggleMenu()" class="mr-4 text-cyan-400 p-2 rounded-lg bg-slate-800/50">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+                <h1 class="text-2xl font-black italic tracking-tighter text-white">
+                    OMNI<span class="text-cyan-400">TUTOR</span> <span class="text-xs bg-fuchsia-600 text-white px-1 rounded ml-1">v2.0</span>
+                </h1>
+            </div>
+            <div id="status-badge" class="hidden md:block text-xs font-mono text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded">
+                SYSTEM: ONLINE
+            </div>
+        </header>
+
+        <div id="interface-container" class="px-4 md:px-8 max-w-7xl mx-auto">
+
+            <!-- 1. HOME -->
+            <section id="interface-home" class="interface-view animate-fade-in">
+                <div class="text-center py-10">
+                    <h2 class="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 mb-6 text-neon">
+                        LEARN. CODE. EVOLVE.
+                    </h2>
+                    <p class="text-slate-400 text-lg max-w-2xl mx-auto mb-8">
+                        The ultimate AI-powered development environment. Write code, get instant feedback, and master new skills in a cyberpunk workspace.
+                    </p>
+                    <div class="flex justify-center gap-4">
+                        <button onclick="app.showInterface('ai-assistant')" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-8 rounded-full shadow-neon transition transform hover:scale-105">
+                            Start Learning <i class="fa-solid fa-rocket ml-2"></i>
+                        </button>
+                        <a href="https://omni-ai-tutor-v1.netlify.app/" target="_blank" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-8 rounded-full border border-slate-500 transition transform hover:scale-105">
+                            Visit v1.0
+                        </a>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+                    <div onclick="app.showInterface('ai-assistant')" class="bg-slate-800/50 p-6 rounded-xl border border-slate-700 hover:border-cyan-500 transition cursor-pointer group">
+                        <div class="h-12 w-12 bg-cyan-900/50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-cyan-600 transition">
+                            <i class="fa-solid fa-brain text-cyan-400 group-hover:text-white text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Gemini AI Assistant</h3>
+                        <p class="text-slate-400 text-sm">Context-aware coding help, debugging, and concept explanation.</p>
+                    </div>
+
+                    <div onclick="app.showInterface('code-editor')" class="bg-slate-800/50 p-6 rounded-xl border border-slate-700 hover:border-fuchsia-500 transition cursor-pointer group">
+                        <div class="h-12 w-12 bg-fuchsia-900/50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-fuchsia-600 transition">
+                            <i class="fa-solid fa-code text-fuchsia-400 group-hover:text-white text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Pro Code Editor</h3>
+                        <p class="text-slate-400 text-sm">Multi-tab environment with syntax highlighting for HTML, CSS, & JS.</p>
+                    </div>
+
+                    <div onclick="app.showInterface('settings')" class="bg-slate-800/50 p-6 rounded-xl border border-slate-700 hover:border-emerald-500 transition cursor-pointer group">
+                        <div class="h-12 w-12 bg-emerald-900/50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-emerald-600 transition">
+                            <i class="fa-solid fa-gear text-emerald-400 group-hover:text-white text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Customization</h3>
+                        <p class="text-slate-400 text-sm">Configure your API key, themes, and editor preferences.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. AI ASSISTANT -->
+            <section id="interface-ai-assistant" class="interface-view hidden">
+                <div class="flex flex-col h-[80vh] bg-slate-900/80 rounded-2xl border border-slate-700 overflow-hidden shadow-2xl">
+                    <div class="bg-slate-950 p-4 border-b border-slate-800 flex justify-between items-center">
+                        <span class="font-bold text-cyan-400"><i class="fa-solid fa-robot mr-2"></i>Gemini 2.0 Flash</span>
+                        <div id="ai-status-indicator" class="text-xs text-slate-500">
+                             <span class="w-2 h-2 rounded-full bg-slate-500 inline-block mr-1"></span> Offline (Set Key in Settings)
+                        </div>
+                    </div>
+                    
+                    <div id="chat-history" class="flex-grow overflow-y-auto p-4 space-y-4">
+                        <div class="flex justify-start">
+                            <div class="bg-slate-800 text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] text-sm shadow-sm">
+                                Hello! I'm OmniTutor. Please go to <b>Settings</b> and enter your API Key to start chatting!
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-slate-950 border-t border-slate-800">
+                        <div class="relative">
+                            <input id="ai-input" type="text" placeholder="Type your request here..." 
+                                class="w-full bg-slate-900 text-white pl-4 pr-12 py-3 rounded-xl border border-slate-700 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500">
+                            <button id="ai-send-btn" class="absolute right-2 top-2 p-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition">
+                                <i class="fa-solid fa-paper-plane text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. CODE EDITOR -->
+            <section id="interface-code-editor" class="interface-view hidden">
+                <div class="flex flex-col h-[80vh] bg-slate-900/80 rounded-2xl border border-slate-700 overflow-hidden">
+                    <div class="flex bg-slate-950 border-b border-slate-800 overflow-x-auto">
+                        <button class="editor-tab px-6 py-3 text-sm font-medium text-cyan-400 border-b-2 border-cyan-400 bg-slate-900" data-lang="html">index.html</button>
+                        <button class="editor-tab px-6 py-3 text-sm font-medium text-slate-400 hover:text-white border-b-2 border-transparent" data-lang="css">style.css</button>
+                        <button class="editor-tab px-6 py-3 text-sm font-medium text-slate-400 hover:text-white border-b-2 border-transparent" data-lang="js">app.js</button>
+                    </div>
+                    
+                    <div class="relative flex-grow">
+                        <textarea id="editor-html" class="absolute inset-0 w-full h-full bg-slate-900 text-green-300 font-mono p-4 text-sm focus:outline-none resize-none" spellcheck="false"><!-- HTML Structure -->
+<div class="container">
+    <h1>Hello World</h1>
+    <p>Edit me!</p>
+</div></textarea>
+                        <textarea id="editor-css" class="absolute inset-0 w-full h-full bg-slate-900 text-blue-300 font-mono p-4 text-sm focus:outline-none resize-none hidden" spellcheck="false">/* CSS Styles */
+body { 
+    background: #111; 
+    color: white; 
+}</textarea>
+                        <textarea id="editor-js" class="absolute inset-0 w-full h-full bg-slate-900 text-yellow-300 font-mono p-4 text-sm focus:outline-none resize-none hidden" spellcheck="false">// JavaScript Logic
+console.log('Ready');</textarea>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- 4. LIVE PREVIEW -->
+            <section id="interface-live-preview" class="interface-view hidden">
+                 <div class="bg-slate-900 rounded-2xl border border-slate-700 h-[80vh] flex flex-col p-2">
+                    <div class="flex justify-center space-x-2 mb-2">
+                        <button class="text-xs bg-slate-700 px-3 py-1 rounded text-white" onclick="app.resizePreview('100%')">Desktop</button>
+                        <button class="text-xs bg-slate-700 px-3 py-1 rounded text-white" onclick="app.resizePreview('375px')">Mobile</button>
+                    </div>
+                    <iframe id="live-frame" class="flex-grow w-full bg-white rounded transition-all duration-300 mx-auto"></iframe>
+                 </div>
+            </section>
+            
+             <!-- 5. FILE MANAGER -->
+            <section id="interface-file-manager" class="interface-view hidden">
+                <div class="grid md:grid-cols-3 gap-6 h-[70vh]">
+                    <div class="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+                        <h3 class="text-slate-400 text-xs font-bold uppercase mb-4">Project Files</h3>
+                        <ul class="space-y-2 text-sm">
+                            <li class="flex items-center text-cyan-300 p-2 bg-slate-700/50 rounded cursor-pointer"><i class="fa-solid fa-file-code mr-3"></i> index.html</li>
+                            <li class="flex items-center text-slate-400 p-2 hover:bg-slate-700/50 rounded cursor-pointer transition"><i class="fa-solid fa-file-css mr-3"></i> style.css</li>
+                            <li class="flex items-center text-slate-400 p-2 hover:bg-slate-700/50 rounded cursor-pointer transition"><i class="fa-brands fa-js mr-3"></i> app.js</li>
+                            <li class="flex items-center text-slate-400 p-2 hover:bg-slate-700/50 rounded cursor-pointer transition"><i class="fa-solid fa-image mr-3"></i> assets/</li>
+                        </ul>
+                    </div>
+                    <div class="md:col-span-2 bg-slate-800/50 rounded-xl border border-slate-700 p-4 flex items-center justify-center text-slate-500">
+                        Select a file to preview details
+                    </div>
+                </div>
+            </section>
+
+             <!-- 6. V2 DASHBOARD -->
+            <section id="interface-v2-advanced" class="interface-view hidden">
+                <h2 class="text-2xl font-bold text-white mb-6">Advanced Dashboard</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                         <div class="text-slate-400 text-xs uppercase">Memory</div>
+                         <div class="text-2xl font-mono text-cyan-400">124 MB</div>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                         <div class="text-slate-400 text-xs uppercase">Latency</div>
+                         <div class="text-2xl font-mono text-green-400">12ms</div>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                         <div class="text-slate-400 text-xs uppercase">API Calls</div>
+                         <div class="text-2xl font-mono text-fuchsia-400">48</div>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                         <div class="text-slate-400 text-xs uppercase">Errors</div>
+                         <div class="text-2xl font-mono text-slate-200">0</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 7. SETTINGS INTERFACE -->
+            <section id="interface-settings" class="interface-view hidden">
+                <div class="bg-slate-900/80 rounded-2xl border border-slate-700 p-6 md:p-8 max-w-3xl mx-auto shadow-2xl">
+                    <h2 class="text-3xl font-bold text-white mb-8 border-b border-slate-700 pb-4">
+                        <i class="fa-solid fa-gear text-slate-400 mr-2"></i> Settings
+                    </h2>
+                    
+                    <!-- API Key Setting -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-semibold text-cyan-400 mb-2">Gemini API Key</h3>
+                        <p class="text-sm text-slate-400 mb-4">Enter your Google Gemini API key to enable the AI Assistant features. This key is stored locally in your browser.</p>
+                        <div class="flex gap-2">
+                            <input id="setting-api-key" type="password" placeholder="AIzaSy..." class="flex-grow bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-cyan-500 focus:outline-none">
+                            <button onclick="app.saveApiKey()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-2 rounded-lg font-bold transition">Save</button>
+                        </div>
+                        <p id="api-save-status" class="text-xs mt-2 h-4"></p>
+                    </div>
+
+                    <!-- Theme Setting -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-semibold text-fuchsia-400 mb-2">Visual Theme</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <button onclick="app.setTheme('cyberpunk')" class="p-4 rounded-xl border border-cyan-500 bg-slate-900 hover:bg-slate-800 transition text-left relative overflow-hidden">
+                                <div class="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+                                <span class="font-bold text-white block">Neon Cyberpunk</span>
+                                <span class="text-xs text-slate-400">Default dark mode with neon accents.</span>
+                            </button>
+                            <button onclick="app.setTheme('minimal')" class="p-4 rounded-xl border border-slate-600 bg-gray-900 hover:bg-gray-800 transition text-left relative overflow-hidden">
+                                <div class="absolute top-0 left-0 w-1 h-full bg-slate-400"></div>
+                                <span class="font-bold text-white block">Minimal Dark</span>
+                                <span class="text-xs text-slate-400">Clean, low-distraction interface.</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Editor Setting -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-semibold text-emerald-400 mb-2">Editor Preferences</h3>
+                        <div class="flex items-center justify-between bg-slate-950 p-4 rounded-lg border border-slate-800">
+                            <span class="text-slate-300">Font Size</span>
+                            <div class="flex items-center gap-2">
+                                <button onclick="app.adjustFontSize(-1)" class="w-8 h-8 rounded bg-slate-800 text-white hover:bg-slate-700">-</button>
+                                <span id="font-size-display" class="w-8 text-center text-cyan-400 font-mono">14</span>
+                                <button onclick="app.adjustFontSize(1)" class="w-8 h-8 rounded bg-slate-800 text-white hover:bg-slate-700">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-slate-700 pt-6 flex justify-between items-center">
+                        <span class="text-xs text-slate-500">OmniTutor v2.0.1</span>
+                        <button onclick="localStorage.clear(); location.reload()" class="text-xs text-red-400 hover:text-red-300">Reset All Settings</button>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- LOGIC -->
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+        
+        const state = {
+            menuExpanded: false,
+            currentInterface: 'home',
+            apiKey: localStorage.getItem('omnitutor_api_key') || '',
+            editorFontSize: 14
+        };
+
+        const dom = {
+            body: document.body,
+            menu: document.getElementById('main-menu'),
+            menuToggle: document.getElementById('main-menu-toggle'),
+            backdrop: document.getElementById('mobile-backdrop'),
+            views: document.querySelectorAll('.interface-view'),
+            menuText: document.querySelectorAll('.menu-text'),
+            editorTabs: document.querySelectorAll('.editor-tab'),
+            editors: {
+                html: document.getElementById('editor-html'),
+                css: document.getElementById('editor-css'),
+                js: document.getElementById('editor-js')
+            },
+            liveFrame: document.getElementById('live-frame'),
+            apiInput: document.getElementById('setting-api-key'),
+            aiStatus: document.getElementById('ai-status-indicator'),
+            aiStatusDot: document.querySelector('#ai-status-indicator span')
+        };
+
+        const app = {
+            init: () => {
+                // Initialize Listeners
+                document.getElementById('main-menu-toggle').addEventListener('click', app.toggleMenu);
+                
+                if (window.innerWidth >= 768) {
+                    app.toggleMenu(true);
+                }
+                
+                // Load saved API key
+                if(state.apiKey) {
+                    dom.apiInput.value = state.apiKey;
+                    app.updateAiStatus(true);
+                }
+
+                // Chat
+                document.getElementById('ai-send-btn').addEventListener('click', app.sendMessage);
+                document.getElementById('ai-input').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') app.sendMessage();
+                });
+
+                // Tabs
+                dom.editorTabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        const lang = tab.dataset.lang;
+                        dom.editorTabs.forEach(t => {
+                            t.classList.remove('text-cyan-400', 'border-cyan-400', 'bg-slate-900');
+                            t.classList.add('text-slate-400', 'border-transparent');
+                        });
+                        tab.classList.add('text-cyan-400', 'border-cyan-400', 'bg-slate-900');
+                        tab.classList.remove('text-slate-400', 'border-transparent');
+                        Object.values(dom.editors).forEach(el => el.classList.add('hidden'));
+                        dom.editors[lang].classList.remove('hidden');
+                    });
+                });
+                
+                // Auto-run Preview
+                [dom.editors.html, dom.editors.css, dom.editors.js].forEach(el => {
+                    el.addEventListener('input', app.updatePreview);
+                });
+                app.updatePreview();
+            },
+
+            toggleMenu: (forceState) => {
+                const newState = typeof forceState === 'boolean' ? forceState : !dom.menu.classList.contains('expanded');
+                if (newState) {
+                    dom.menu.classList.add('expanded');
+                    dom.backdrop.classList.add('active');
+                    dom.menuText.forEach(el => el.classList.remove('opacity-0'));
+                } else {
+                    dom.menu.classList.remove('expanded');
+                    dom.backdrop.classList.remove('active');
+                    dom.menuText.forEach(el => el.classList.add('opacity-0'));
+                }
+            },
+
+            showInterface: (id) => {
+                dom.views.forEach(v => v.classList.add('hidden'));
+                const target = document.getElementById('interface-' + id);
+                if(target) target.classList.remove('hidden');
+                if (window.innerWidth < 768) {
+                    app.toggleMenu(false);
+                }
+            },
+
+            updatePreview: () => {
+                const html = dom.editors.html.value;
+                const css = `<style>${dom.editors.css.value}</style>`;
+                const js = `<script>${dom.editors.js.value}<\/script>`;
+                const doc = dom.liveFrame.contentDocument || dom.liveFrame.contentWindow.document;
+                doc.open();
+                doc.write(html + css + js);
+                doc.close();
+            },
+
+            resizePreview: (width) => {
+                dom.liveFrame.style.maxWidth = width;
+            },
+            
+            // --- Settings Logic ---
+            saveApiKey: () => {
+                const key = dom.apiInput.value.trim();
+                if(key) {
+                    localStorage.setItem('omnitutor_api_key', key);
+                    state.apiKey = key;
+                    document.getElementById('api-save-status').innerHTML = '<span class="text-green-400">Key Saved Successfully!</span>';
+                    app.updateAiStatus(true);
+                } else {
+                    document.getElementById('api-save-status').innerHTML = '<span class="text-red-400">Please enter a valid key.</span>';
+                }
+                setTimeout(() => document.getElementById('api-save-status').innerHTML = '', 3000);
+            },
+            
+            updateAiStatus: (online) => {
+                if(online) {
+                    dom.aiStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500 inline-block mr-1"></span> Online';
+                } else {
+                    dom.aiStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-slate-500 inline-block mr-1"></span> Offline (Set Key in Settings)';
+                }
+            },
+
+            setTheme: (theme) => {
+                if(theme === 'minimal') {
+                    document.documentElement.style.setProperty('--neon-blue', '#94a3b8');
+                    document.documentElement.style.setProperty('--neon-fuchsia', '#64748b');
+                    document.body.style.backgroundColor = '#111827';
+                } else {
+                    // Reset to CSS defaults (reload or explicit set)
+                    document.documentElement.style.setProperty('--neon-blue', '#06b6d4');
+                    document.documentElement.style.setProperty('--neon-fuchsia', '#d946ef');
+                    document.body.style.backgroundColor = '#00001a';
+                }
+            },
+            
+            adjustFontSize: (change) => {
+                state.editorFontSize += change;
+                if(state.editorFontSize < 10) state.editorFontSize = 10;
+                if(state.editorFontSize > 24) state.editorFontSize = 24;
+                
+                document.getElementById('font-size-display').innerText = state.editorFontSize;
+                
+                Object.values(dom.editors).forEach(el => {
+                    el.style.fontSize = state.editorFontSize + 'px';
+                });
+            },
+
+            // --- AI Logic ---
+            sendMessage: async () => {
+                if(!state.apiKey) {
+                    alert("Please set your Gemini API Key in Settings first!");
+                    app.showInterface('settings');
+                    return;
+                }
+
+                const input = document.getElementById('ai-input');
+                const history = document.getElementById('chat-history');
+                const text = input.value.trim();
+                if(!text) return;
+
+                const userDiv = document.createElement('div');
+                userDiv.className = "flex justify-end";
+                userDiv.innerHTML = `<div class="bg-cyan-700 text-white p-3 rounded-2xl rounded-br-none max-w-[85%] text-sm shadow-md">${text}</div>`;
+                history.appendChild(userDiv);
+                
+                input.value = '';
+                history.scrollTop = history.scrollHeight;
+
+                try {
+                    const genAI = new GoogleGenerativeAI(state.apiKey);
+                    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+                    
+                    const result = await model.generateContent(text);
+                    const response = await result.response;
+                    const markdown = response.text();
+                    
+                    // Simple formatter (converts newlines to br, very basic markdown)
+                    const formatted = markdown.replace(/\n/g, '<br>');
+
+                    const aiDiv = document.createElement('div');
+                    aiDiv.className = "flex justify-start animate-fade-in";
+                    aiDiv.innerHTML = `<div class="bg-slate-800 text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] text-sm shadow-sm leading-relaxed">${formatted}</div>`;
+                    history.appendChild(aiDiv);
+                } catch (error) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = "flex justify-start";
+                    errorDiv.innerHTML = `<div class="bg-red-900/50 text-red-200 p-3 rounded-2xl text-sm border border-red-500">Error: ${error.message}</div>`;
+                    history.appendChild(errorDiv);
+                }
+                history.scrollTop = history.scrollHeight;
+            }
+        };
+
+        window.app = app;
+        window.addEventListener('load', app.init);
+    </script>
+</body>
+</html>
